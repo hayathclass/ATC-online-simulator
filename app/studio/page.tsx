@@ -23,6 +23,11 @@ import {
   Unlock,
 } from 'lucide-react'
 import Link from 'next/link'
+import {
+  saveWhiteboardSession,
+  deleteWhiteboardSession,
+  getAllWhiteboardSessions,
+} from '@/lib/firebase/whiteboard-service'
 
 // Type definitions
 interface Point {
@@ -100,19 +105,11 @@ export default function StudioPage() {
   // Color palette
   const colors = ['#ffffff', '#fbbf24', '#f87171', '#60a5fa', '#34d399', '#a78bfa', '#f472b6']
   
-  // Load saved sessions from localStorage
+  // Load saved sessions from Firebase
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('whiteboard-sessions')
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) {
-          setSavedSessions(parsed)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load sessions:', error)
-    }
+    getAllWhiteboardSessions()
+      .then(sessions => setSavedSessions(sessions))
+      .catch(console.error)
   }, [])
   
   // Initialize and resize canvas
@@ -359,25 +356,21 @@ export default function StudioPage() {
     })
   }
   
-  // Save session (Teacher only)
-  const saveSession = () => {
-    // Only teachers can save
+  // Save session (Teacher only) - saves to Firebase
+  const saveSession = async () => {
     if (!isTeacher) {
       alert('Only teachers can save sessions')
       return
     }
-    
     if (!sessionName.trim()) {
       alert('Please enter a session name')
       return
     }
-    
     const hasStrokes = pages.some(page => page.strokes.length > 0)
     if (!hasStrokes) {
       alert('Draw something before saving')
       return
     }
-    
     const session: Session = {
       id: `session-${Date.now()}`,
       className: sessionName.trim(),
@@ -390,15 +383,18 @@ export default function StudioPage() {
       })),
       currentPageIndex: 0,
     }
-    
-    const updatedSessions = [...savedSessions, session]
-    setSavedSessions(updatedSessions)
-    localStorage.setItem('whiteboard-sessions', JSON.stringify(updatedSessions))
-    
-    setCurrentSession(session)
-    setShowSaveDialog(false)
-    setSessionName('')
-    alert('Session saved successfully!')
+    try {
+      await saveWhiteboardSession(session)
+      const updatedSessions = [session, ...savedSessions]
+      setSavedSessions(updatedSessions)
+      setCurrentSession(session)
+      setShowSaveDialog(false)
+      setSessionName('')
+      alert('Session saved! All students can now see it.')
+    } catch (error) {
+      console.error('Failed to save session:', error)
+      alert('Failed to save session. Please try again.')
+    }
   }
   
   // Load session
@@ -416,28 +412,24 @@ export default function StudioPage() {
     setRedoStack([])
   }
   
-  // Delete session (Teacher only)
-  const deleteSession = (sessionId: string, event: React.MouseEvent) => {
+  // Delete session (Teacher only) - deletes from Firebase
+  const deleteSession = async (sessionId: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    
-    // Only teachers can delete
     if (!isTeacher) {
       alert('Only teachers can delete sessions')
       return
     }
-    
     if (!confirm('Are you sure you want to delete this session? This action cannot be undone.')) return
-    
-    const updatedSessions = savedSessions.filter(s => s.id !== sessionId)
-    setSavedSessions(updatedSessions)
-    localStorage.setItem('whiteboard-sessions', JSON.stringify(updatedSessions))
-    
-    // If current session was deleted, reset
-    if (currentSession?.id === sessionId) {
-      setCurrentSession(null)
+    try {
+      await deleteWhiteboardSession(sessionId)
+      const updatedSessions = savedSessions.filter(s => s.id !== sessionId)
+      setSavedSessions(updatedSessions)
+      if (currentSession?.id === sessionId) setCurrentSession(null)
+      alert('Session deleted successfully!')
+    } catch (error) {
+      console.error('Failed to delete session:', error)
+      alert('Failed to delete session. Please try again.')
     }
-    
-    alert('Session deleted successfully!')
   }
   
   // Export as image
@@ -639,9 +631,17 @@ export default function StudioPage() {
           <div className="w-80 border-r border-white/10 bg-black/20 p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-white">Saved Sessions</h2>
-              {isReadOnly && (
-                <span className="text-xs text-yellow-400">View Only</span>
-              )}
+              <div className="flex items-center gap-2">
+                {isReadOnly && (
+                  <span className="text-xs text-yellow-400">View Only</span>
+                )}
+                <button
+                  onClick={() => getAllWhiteboardSessions().then(setSavedSessions).catch(console.error)}
+                  className="text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
             {savedSessions.length === 0 ? (
               <p className="text-sm text-white/50">No saved sessions yet</p>
