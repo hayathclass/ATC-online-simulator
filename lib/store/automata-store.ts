@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import {
   saveAutomatonToFirebase,
   deleteAutomatonFromFirebase,
@@ -83,6 +82,9 @@ interface AutomataStore {
   resetSimulation: () => void
   setSimulationSpeed: (speed: number) => void
   
+  // Firebase sync state
+  isLoadingFromFirebase: boolean
+
   // Save/Load
   saveAutomaton: () => void
   loadAutomaton: (id: string) => void
@@ -128,13 +130,13 @@ const initialSimulation: SimulationState = {
 }
 
 export const useAutomataStore = create<AutomataStore>()(
-  persist(
     (set, get) => ({
       currentAutomaton: null,
       simulation: initialSimulation,
       savedAutomata: [],
       history: [],
       historyIndex: -1,
+      isLoadingFromFirebase: false,
 
       setCurrentAutomaton: (automaton) => {
         set({ currentAutomaton: automaton, simulation: initialSimulation })
@@ -508,17 +510,14 @@ export const useAutomataStore = create<AutomataStore>()(
       },
 
       loadAllAutomata: async () => {
-        const firebaseAutomata = await getAllAutomataFromFirebase()
-        if (firebaseAutomata.length > 0) {
-          // Merge Firebase data with local, Firebase takes priority
-          const localAutomata = get().savedAutomata
-          const merged = [...firebaseAutomata]
-          localAutomata.forEach((local) => {
-            if (!merged.find((f) => f.id === local.id)) {
-              merged.push(local)
-            }
-          })
-          set({ savedAutomata: merged })
+        set({ isLoadingFromFirebase: true })
+        try {
+          const firebaseAutomata = await getAllAutomataFromFirebase()
+          set({ savedAutomata: firebaseAutomata })
+        } catch (e) {
+          console.error('Failed to load from Firebase:', e)
+        } finally {
+          set({ isLoadingFromFirebase: false })
         }
       },
 
@@ -720,12 +719,7 @@ export const useAutomataStore = create<AutomataStore>()(
           },
         })
       },
-    }),
-    {
-      name: 'automata-lab-storage',
-      partialize: (state) => ({ savedAutomata: state.savedAutomata }),
-    }
-  )
+    })
 )
 
 // Helper function to compute epsilon closure

@@ -1,13 +1,11 @@
 import {
   collection,
   doc,
-  addDoc,
   setDoc,
   deleteDoc,
   getDocs,
   orderBy,
   query,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import type { Automaton } from '@/lib/store/automata-store';
