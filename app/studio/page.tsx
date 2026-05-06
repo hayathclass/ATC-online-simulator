@@ -367,10 +367,7 @@ export default function StudioPage() {
       return
     }
     const hasStrokes = pages.some(page => page.strokes.length > 0)
-    if (!hasStrokes) {
-      alert('Draw something before saving')
-      return
-    }
+    // Allow saving even with empty canvas
     const session: Session = {
       id: `session-${Date.now()}`,
       className: sessionName.trim(),
@@ -391,9 +388,9 @@ export default function StudioPage() {
       setShowSaveDialog(false)
       setSessionName('')
       alert('Session saved! All students can now see it.')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save session:', error)
-      alert('Failed to save session. Please try again.')
+      alert(`Failed to save session: ${error?.message || 'Unknown error'}. Check browser console for details.`)
     }
   }
   
@@ -605,7 +602,6 @@ export default function StudioPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowSaveDialog(true)}
-              disabled={!hasAnyStrokes}
               className="gap-2 border-white/20 text-white hover:bg-white/10"
             >
               <Save className="h-4 w-4" />
