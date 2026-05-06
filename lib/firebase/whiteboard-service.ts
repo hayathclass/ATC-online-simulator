@@ -26,6 +26,15 @@ export interface WhiteboardSession {
 
 const COLLECTION = 'whiteboard_sessions';
 
+// Compress strokes by reducing point density to stay under Firestore 1MB limit
+const compressStrokes = (strokes: any[]): any[] => {
+  return strokes.map(stroke => ({
+    ...stroke,
+    // Keep every 3rd point to reduce size
+    points: stroke.points?.filter((_: any, i: number) => i % 3 === 0) || [],
+  }))
+}
+
 export const saveWhiteboardSession = async (session: WhiteboardSession): Promise<void> => {
   if (!isFirebaseConfigured || !db) {
     // fallback to localStorage
@@ -38,7 +47,24 @@ export const saveWhiteboardSession = async (session: WhiteboardSession): Promise
     } catch {}
     return;
   }
-  await setDoc(doc(db, COLLECTION, session.id), session);
+
+  const compressed = {
+    ...session,
+    pages: session.pages.map(page => ({
+      ...page,
+      strokes: compressStrokes(page.strokes || []),
+    })),
+  }
+
+  // Timeout after 10 seconds
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Save timed out — check Firebase connection')), 10000)
+  )
+
+  await Promise.race([
+    setDoc(doc(db, COLLECTION, session.id), compressed),
+    timeout,
+  ])
 };
 
 export const deleteWhiteboardSession = async (id: string): Promise<void> => {
