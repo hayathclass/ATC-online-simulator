@@ -31,7 +31,7 @@ import {
   MoreVertical,
   Info,
 } from 'lucide-react'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
 
 export function Header({ title }: { title: string }) {
@@ -40,7 +40,13 @@ export function Header({ title }: { title: string }) {
     saveAutomaton,
     exportAutomaton,
     importAutomaton,
+    loadAllAutomata,
   } = useAutomataStore()
+
+  // Load all automata from Firebase on mount
+  useEffect(() => {
+    loadAllAutomata().catch(console.error)
+  }, [])
 
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importJson, setImportJson] = useState('')

@@ -1,5 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import {
+  saveAutomatonToFirebase,
+  deleteAutomatonFromFirebase,
+  getAllAutomataFromFirebase,
+} from '@/lib/firebase/automata-service'
 
 export interface State {
   id: string
@@ -82,6 +87,7 @@ interface AutomataStore {
   saveAutomaton: () => void
   loadAutomaton: (id: string) => void
   deleteAutomaton: (id: string) => void
+  loadAllAutomata: () => Promise<void>
   exportAutomaton: () => string
   importAutomaton: (json: string) => boolean
   
@@ -475,6 +481,9 @@ export const useAutomataStore = create<AutomataStore>()(
         } else {
           set({ savedAutomata: [...savedAutomata, currentAutomaton] })
         }
+
+        // Sync to Firebase
+        saveAutomatonToFirebase(currentAutomaton).catch(console.error)
       },
 
       loadAutomaton: (id) => {
@@ -494,6 +503,23 @@ export const useAutomataStore = create<AutomataStore>()(
         set((state) => ({
           savedAutomata: state.savedAutomata.filter((a) => a.id !== id),
         }))
+        // Sync to Firebase
+        deleteAutomatonFromFirebase(id).catch(console.error)
+      },
+
+      loadAllAutomata: async () => {
+        const firebaseAutomata = await getAllAutomataFromFirebase()
+        if (firebaseAutomata.length > 0) {
+          // Merge Firebase data with local, Firebase takes priority
+          const localAutomata = get().savedAutomata
+          const merged = [...firebaseAutomata]
+          localAutomata.forEach((local) => {
+            if (!merged.find((f) => f.id === local.id)) {
+              merged.push(local)
+            }
+          })
+          set({ savedAutomata: merged })
+        }
       },
 
       exportAutomaton: () => {
