@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import Script from 'next/script'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
@@ -64,6 +65,12 @@ export default function RootLayout({
           {children}
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
+        {/* EXTREME SecOps — 24/7 Real-Time Telemetry & Visitor Collector */}
+        <Script
+          src={`${process.env.NEXT_PUBLIC_EXTREME_COLLECTOR_URL || 'https://extreme-secops.onrender.com'}/api/collector/script.js`}
+          data-target-id="target-atc-simulator"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   )
